@@ -5,11 +5,13 @@ using IMSDataAccess;
 using MediatR;
 using IMSBusinessLogic.MediatR.Queries;
 using IMSBusinessLogic.MediatR.Commands;
+using Microsoft.AspNetCore.Cors;
 
 namespace InventoryManagementSystem.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
+    [EnableCors("AllowSpecificOrigin")]
     public class ProductsController: Controller
     {
 
@@ -33,12 +35,15 @@ namespace InventoryManagementSystem.Controllers
         [Route("{id}")]
         public async Task<IActionResult> Getproductpro(int id)
         {
-            var pro2 = await mediator.Send(new GetByIdQuery(id));
-            if (pro2 == null)
+            try
             {
-                return NotFound();
+                var pro2 = await mediator.Send(new GetByIdQuery(id));
+                return Ok(pro2);
             }
-            return Ok(pro2);
+            catch (ProductNotFoundException)
+            {
+                return Ok("product id is invalid");
+            }
         }
        [HttpPost]
         [Route("/create")]
@@ -53,22 +58,34 @@ namespace InventoryManagementSystem.Controllers
         [Route("/update/{id}/{stock}")]
         public async Task<IActionResult> Update(int id,int stock)
         {
-             var pro=await mediator.Send(new UpdateCommand(id,stock));
-            if (pro == null)
+            try
             {
-                return NotFound();
+                var pro = await mediator.Send(new UpdateCommand(id, stock));
+
+                return Ok(pro);
             }
-            return Ok(pro);
+            catch (NegativeNumerException)
+            {
+                return Ok("entered value should be positive");
+            }
+            catch (ProductNotFoundException)
+            {
+                return Ok("product not found");
+            }
+            catch (Exception)
+            {
+                return Ok("error");
+            }
         }
-        [HttpPut]
+        [HttpPost]
         [Route("/recordsale")]
         
-        public async Task<IActionResult> Sale([FromBody] List<Order> sale)
+        public async Task<(List<Product>, List<string>)> Sale([FromBody] List<Order> sale)
 
         {
             //var salesList = sale.Select(s => (s.prodId, s.quantity)).ToList();
-            var product =await mediator.Send(new RecordSaleQuery(sale));
-            foreach (var p in product)
+            var sales =await mediator.Send(new RecordSaleQuery(sale));
+            foreach (var p in sales.Item1)
             {
      
                 if (p.StockLevel < p.Threshold)
@@ -79,7 +96,7 @@ namespace InventoryManagementSystem.Controllers
                 }
             }
 
-            return Ok();
+            return (sales.Item1,sales.Item2);
         }
         [HttpGet]
         [Route("/generatereport")]

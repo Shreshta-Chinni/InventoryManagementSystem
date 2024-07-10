@@ -18,7 +18,12 @@ namespace IMSDataAccess
 
         public async Task<Product> getbyId(int id)
         {
-            return await _db.Products.SingleOrDefaultAsync(p => p.ProductID == id);
+            var pro = await _db.Products.SingleOrDefaultAsync(p => p.ProductID == id);
+            if (pro == null)
+            {
+                throw new ProductNotFoundException();
+            }
+            return pro;
         }
 
         public async Task<List<Product>> getAll()
@@ -43,28 +48,26 @@ namespace IMSDataAccess
         {
             if (stock < 0)
             {
-                throw new Exception("Value cannot be less than zero");
+                throw new NegativeNumerException("Value cannot be less than zero");
             }
-            
-            
-                var pro = await _db.Products.FindAsync(id);
-                if (pro == null)
-                {
-                    pro.StockLevel = stock;
-                    _db.Products.Update(pro);
-                    await _db.SaveChangesAsync();
-                    return pro;
-                }
-                else
-                {
-                    return null;
-                }
-            
+
+
+            var pro = await _db.Products.FindAsync(id);
+            if (pro == null)
+            {
+                throw new ProductNotFoundException();
+            }
+            pro.StockLevel = stock;
+            _db.Products.Update(pro);
+            await _db.SaveChangesAsync();
+            return pro;
+
         }
 
-        public async Task<List<Product>> RecordSales(List<Order> sales)
+        public async Task<(List<Product>,List<string>)> RecordSales(List<Order> sales)
         {
             var updatedProducts = new List<Product>();
+            var outOfStockProducts = new List<string>();
             foreach (var p in sales)
             {
               
@@ -73,9 +76,9 @@ namespace IMSDataAccess
                 {
                     if (product.StockLevel < p.quantity)
                     {
-
-                        Email email = new Email();
-                        await email.Emailmet("dasasaipooja@gmail.com", "out of stock", product.ProductName);
+                        outOfStockProducts.Add(product.ProductName);
+                        //Email email = new Email();
+                        //await email.Emailmet("dasasaipooja@gmail.com", "out of stock", product.ProductName);
                     }
                     else
                     {
@@ -113,10 +116,10 @@ namespace IMSDataAccess
                 }
                 else
                 {
-                    return null;
+                    return (null,outOfStockProducts);
                 }
             }
-            return updatedProducts;
+            return (updatedProducts, outOfStockProducts);
 
         }
 
